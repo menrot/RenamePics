@@ -104,6 +104,6 @@ venv.bak/
 .mypy_cache/
 
 # Project specific
-/Trip 2017
+/Trip\ 2017
 /source/.idea
 
