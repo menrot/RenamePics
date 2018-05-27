@@ -1,4 +1,4 @@
-## Rename pics based on Itinerary file and sequntial order at each location.
+## Rename pictures based on Itinerary file and sequential order at each location.
 ##
 ##
 # 1. In itinerary two successive lines have to have different names
@@ -96,7 +96,7 @@ def writeLog(*args):
 # get folder name
 
 if len(sys.argv) == 1:
-    print "Usage: ReanmePics PicRootFolder")
+    print "Usage: ReanmePics PicRootFolder"
     exit(1)
 
 else:
@@ -106,12 +106,11 @@ else:
 MyDebug = False
 UsePreviousFileList = False
 
-# os.chdir(os.path.join(os.environ['USERPROFILE'], "Google Drive\\My Pictures"))
 os.chdir(PicRootFolder)
 
 foldername = raw_input("Enter folder name: ")
 if len(foldername) == 0:
-    foldername = "data"
+    foldername = "data" # for test purposes
 
 try:
     filenames = next(os.walk(foldername))[2]

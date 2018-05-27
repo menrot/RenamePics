@@ -16,7 +16,7 @@ def PrintTags(filename):
 
 
 # os.chdir(os.path.join(os.environ['USERPROFILE'], "Google Drive\\My Pictures"))
-os.chdir("D:\\users\Menashe\G Drive\\My Pictures")
+os.chdir("D:\\users\Menashe\mG Drive\\My Pictures")
 
 foldername = raw_input("Enter folder name: ")
 if len(foldername) == 0:

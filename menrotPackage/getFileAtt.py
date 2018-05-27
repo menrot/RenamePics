@@ -17,7 +17,7 @@ def GetFolderAndPIDLForPath(filename):
     return folder, pidl
 
 
-os.chdir("D:\\users\\menashe\\G Drive\\My Pictures")
+os.chdir("D:\\users\\menashe\\mG Drive\\My Pictures")
 
 foldername = raw_input("Enter folder name: ")
 if len(foldername) == 0:
