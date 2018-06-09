@@ -11,25 +11,37 @@ import sys
 import exifread
 import csv
 import pickle
+import argparse
+import re
+
+
+class DateTime(object):
+
+    def __init__(self, value):
+        self.values = value
+        self.printable = str(value)
+        return
 
 
 ## Get the Image time "Exif" time
 class ImageFileData(object):
 
-    def __init__(self, filename):
+    def __init__(self, path, filename):
 
         self.OriginalName = filename
 
         try:
 
-            f = open(filename, 'rb')
+            f = open(path + '\\'+ filename, 'rb')
 
             # for Exif tags description see:
             #   https: // sno.phy.queensu.ca / ~phil / exiftool / TagNames / EXIF.html
             #   https://pypi.python.org/pypi/ExifRead
             #
-            tags = exifread.process_file(f)
 
+            self.DateTime = DateTime(u'1900:01:01 01:01:01')
+            tags = exifread.process_file(f)
+            DateFlag = False
 
             try:
                 self.DateTime = tags.__getitem__('EXIF DateTimeOriginal')
@@ -38,23 +50,40 @@ class ImageFileData(object):
                     self.DateTime = tags.__getitem__('EXIF DateTimeDigitized')
                     writeLog ("Use Digitized DateTime" + repr(filename))
                 except:
-                    self.DateTime = tags.__getitem__("Image DateTime")
-                    writeLog("Use Image DateTime " + repr(filename))
+                    try:
+                        self.DateTime = tags.__getitem__("Image DateTime")
+                        writeLog("Use Image DateTime " + repr(filename))
+                    except:
+                        # writeLog("No DateTime property " + repr(filename))
+                        regex_YYYYMMDD = u'([0-9]{4})(((0[13578]|(10|12))(0[1-9]|[1-2][0-9]|3[0-1]))|(02(0[1-9]|[1-2][0-9]))|((0[469]|11)(0[1-9]|[1-2][0-9]|30)))'
+                        m = re.search(regex_YYYYMMDD, filename)
+                        if not (m is None):
+                            s = m.start()
+                            self.DateTime.values = u'%s:%s:%s 12:00:00' % (filename[s:s+4],filename[s+4:s+6],filename[s+6:s+8])
+                            self.DateTime.printable = str(self.DateTime.values)
+                        else:
+                            raise ValueError('No EXIF and no match for date in file name')
+
 
 
             self.Date = self.DateTime.printable[0:4] + '-' + self.DateTime.printable[5:7] + '-' + self.DateTime.printable[8:10]
 
-            if (tags.__getitem__('Image Make').printable == "HUAWEI"):
-                try:
-                    GPSTime = tags.__getitem__("GPS GPSTimeStamp").values
-                    TimeStr = '{0:02d}:'.format(int(str(GPSTime[0]))) + '{0:02d}:'.format(int(str(GPSTime[1]))) + '{0:02d}'.format(int(str(GPSTime[2])))
-                    self.DateTime.values = unicode(self.DateTime.values[:11] + TimeStr)
-                    self.DateTime.printable = str(self.DateTime.values)
-                except:
-                    writeLog("HUAWEI but No GPS " + repr(filename))
+
+            try:
+                if (tags.__getitem__('Image Make').printable == "HUAWEI"):
+                    try:
+                        GPSTime = tags.__getitem__("GPS GPSTimeStamp").values
+                        TimeStr = '{0:02d}:'.format(int(str(GPSTime[0]))) + '{0:02d}:'.format(int(str(GPSTime[1]))) + '{0:02d}'.format(int(str(GPSTime[2])))
+                        self.DateTime.values = unicode(self.DateTime.values[:11] + TimeStr)
+                        self.DateTime.printable = str(self.DateTime.values)
+                    except:
+                        writeLog("HUAWEI but No GPS timestamp " + repr(filename))
 
 #           GPS_Lat = tags.__getitem__('GPSLatitude')
 #           GPS_Long = tags.__getitem__('GPSLongitutde')
+            except Exception as ex:
+                pass #no EXIF
+
             self.Location = ""
             self.NewName = ""
 
@@ -93,152 +122,168 @@ def writeLog(*args):
 
 
 
-# get folder name
-
-if len(sys.argv) == 1:
-    print "Usage: ReanmePics PicRootFolder"
-    exit(1)
-
-else:
-    PicRootFolder = sys.argv[1]
-
-
 MyDebug = False
-UsePreviousFileList = False
-
-os.chdir(PicRootFolder)
-
-foldername = raw_input("Enter folder name: ")
-if len(foldername) == 0:
-    foldername = "data" # for test purposes
-
-try:
-    filenames = next(os.walk(foldername))[2]
-except:
-    print("No folder")
-    exit(1)
-
-os.chdir(foldername)
-
-ItineraryFile = raw_input("Enter initerary file name (Date, Location): ")
-if len(ItineraryFile) == 0:
-    ItineraryFile = "itinerary.csv"
-
-itinerary = []
-
-GetString = raw_input("Actually Rename? [CR for YES] ")
-if len(GetString) == 0:
-    DoRename = True
-else:
-    DoRename = False
-    GetString = raw_input("Use Previous File List? [CR for NO]")
-    if len(GetString) <> 0:
-        UsePreviousFileList = True
 
 
-with open(ItineraryFile, 'rb') as f:
-    reader = csv.reader(f)
-    for row in reader:
-        itinerary.append(row)
 
-logFile = open(ItineraryFile[:-4] + '.log', 'w') # Log file
-
-
-itinerary.sort(key=getKeyItinerary)
-DefaultTime = itinerary[0][0]
-DefaultLocation = itinerary[0][1]
-
-if not(UsePreviousFileList):
-    ListOfFiles = []
-
-    for j in range(0, len(filenames)):
-
-        if (filenames[j][-4:].upper() == '.JPG'):
-
-            print "\r{0:02d}%".format(j*100/len(filenames)),
-
-            tempData = ImageFileData(filenames[j])
-            if not tempData.Ignore :
-                ListOfFiles.append(ImageFileData(filenames[j]))
+### Usage RenamePics.py RootFolder -i RelativeInputFolder -o RelativeOutputFolder -I itineraryFile  -P  -R
+parser = argparse.ArgumentParser(description='Rename Pics in INPUT based on ITINERARY and move files to OUTPUT')
+parser.add_argument('RootFolder', metavar='RootFolder', type=str,
+                    help='the folder in which the whole processing is done')
+parser.add_argument('-i', dest='InputFolder', action='store',
+                    help='Relative to root input folder name')
+parser.add_argument('-o', dest='OutputFolder', action='store',
+                    help='Relative to root output folder name')
+parser.add_argument('-I', dest='ItineraryFile', action='store',
+                    help='Itinirary file name in root folder')
+parser.add_argument('-P', dest='UsePreviousFileList', action='store_true',
+                    help='Use Previous list, saves processing')
+parser.add_argument('-R', dest='DoRename', action='store_true',  # By default - Dont rename
+                    help='When set- actually rename the files')
 
 
-    # sort the list of files
-    ListOfFiles.sort(key=getKeyImage)
-    with open('listOfFile.pkl', 'wb') as fpkl:
-        pickle.dump(ListOfFiles,fpkl)
-        fpkl.close()
+if __name__ == '__main__':
 
-else:
-    with open('listOfFile.pkl', 'rb') as fpkl:
-        ListOfFiles = pickle.load(fpkl)
-        fpkl.close()
+    print 'RenamePics Release 2.0'   #update release number
 
-j = 0
-State = 0
-Last_i = 0
-Location = DefaultLocation
-LastDate = "1900:01:01"
+    MyArgs = vars(parser.parse_args())
 
-while (j < len(ListOfFiles)):
+    # create variables
+    locals().update(MyArgs)
 
-    if (ListOfFiles[j].DateTime.printable[:10] > LastDate):
-        IdinDay = 1
-        LastDate = ListOfFiles[j].DateTime.printable[:10]
+    workingDir = os.path.abspath(RootFolder)
+    if InputFolder is None:
+        InputFolder = 'inputPics'   # Default value
+    PicInputFolder = os.path.abspath(workingDir + '\\' + InputFolder)
 
-    if MyDebug:
-        print 'j = ', j
+    if OutputFolder is None:
+        OutputFolder = 'ProcessedPics'  # default value
+    PicOutputFolder = os.path.abspath(workingDir + '\\' + OutputFolder)
+
+    if ItineraryFile is None:
+        ItineraryFile = 'itinerary.csv'
+
+    origDir = os.getcwd()
+    os.chdir(workingDir)
+
+    try:
+        filenames = next(os.walk(PicInputFolder))[2]
+    except:
+        print("No Input folder")
+        exit(1)
+
+    itinerary = []
 
 
-    for i in range(Last_i, len(itinerary)-1):
+    try:
+        with open(ItineraryFile, 'rb') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                itinerary.append(row)
 
+    except Exception as ex:
+        print 'Itinerary file exception', ex
+        exit(1)
+
+    logFile = open(ItineraryFile[:-4] + '.log', 'w') # Log file
+
+
+    itinerary.sort(key=getKeyItinerary)
+    DefaultTime = itinerary[0][0]
+    DefaultLocation = itinerary[0][1]
+
+    if not(UsePreviousFileList):
+        ListOfFiles = []
+
+        for j in range(0, len(filenames)):
+
+            if (filenames[j][-4:].upper() == '.JPG'):
+
+                print "\r{0:02d}%".format(j*100/len(filenames)),
+
+                tempData = ImageFileData(PicInputFolder, filenames[j])
+                if not tempData.Ignore :
+                    ListOfFiles.append(tempData)
+
+
+        # sort the list of files
+        ListOfFiles.sort(key=getKeyImage)
+        with open('listOfFile.pkl', 'wb') as fpkl:
+            pickle.dump(ListOfFiles,fpkl)
+            fpkl.close()
+
+    else:
+        with open('listOfFile.pkl', 'rb') as fpkl:
+            ListOfFiles = pickle.load(fpkl)
+            fpkl.close()
+
+    j = 0
+    State = 0
+    Last_i = 0
+    Location = DefaultLocation
+    LastDate = "1900:01:01"
+
+    while (j < len(ListOfFiles)):
+
+        if (ListOfFiles[j].DateTime.printable[:10] > LastDate):
+            IdinDay = 1
+            LastDate = ListOfFiles[j].DateTime.printable[:10]
 
         if MyDebug:
-            print '    i = ', i
-
-        if (ListOfFiles[j].DateTime.printable < itinerary[i][0]):
-            ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
-            IdinDay = IdinDay + 1
-            State = 0
-            j = j + 1
-            break
-        elif (ListOfFiles[j].DateTime.printable < itinerary[i+1][0]):
-            if (State == 0):
-                State = 1
-                Last_i = i
-                Location = itinerary[i][1]
-            ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
-            IdinDay = IdinDay + 1
-            j = j + 1
-            break
-        elif (ListOfFiles[j].DateTime.printable >= itinerary[len(itinerary)-1][0]):
-            Last_i = len(itinerary)-1
-            Location = itinerary[len(itinerary)-1][1]
-            ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
-            j = j + 1
-            IdinDay = IdinDay + 1
-            break
-        else:
-            State = 0
-
-    if MyDebug:
-        print ListOfFiles[j-1].NewName
+            print 'j = ', j
 
 
+        for i in range(Last_i, len(itinerary)-1):
+
+
+            if MyDebug:
+                print '    i = ', i
+
+            if (ListOfFiles[j].DateTime.printable < itinerary[i][0]):
+                ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
+                IdinDay = IdinDay + 1
+                State = 0
+                j = j + 1
+                break
+            elif (ListOfFiles[j].DateTime.printable < itinerary[i+1][0]):
+                if (State == 0):
+                    State = 1
+                    Last_i = i
+                    Location = itinerary[i][1]
+                ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
+                IdinDay = IdinDay + 1
+                j = j + 1
+                break
+            elif (ListOfFiles[j].DateTime.printable >= itinerary[len(itinerary)-1][0]):
+                Last_i = len(itinerary)-1
+                Location = itinerary[len(itinerary)-1][1]
+                ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
+                j = j + 1
+                IdinDay = IdinDay + 1
+                break
+            else:
+                State = 0
+
+        if MyDebug:
+            print ListOfFiles[j-1].NewName
 
 
 
 
-print "\n*** Start Renaming files ***"
 
-for j in range(0, len(ListOfFiles)):
-    try:
-        if DoRename:
-            os.rename(ListOfFiles[j].OriginalName, ListOfFiles[j].NewName)
-        logFile.write(repr(ListOfFiles[j]))
-        print "\r{0:02d}%".format(j * 100 / len(filenames)),
-    except Exception as ex:
-        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-        message = "Failed to rename " + template.format(type(ex).__name__, ex.args)
-        writeLog(message + " " + repr(ListOfFiles[j]))
 
-f.close()
+    print "\n*** Start Renaming files ***"
+
+    if DoRename:
+        for j in range(0, len(ListOfFiles)):
+            try:
+                os.rename(PicInputFolder + '\\' + ListOfFiles[j].OriginalName,
+                          PicOutputFolder + '\\' + ListOfFiles[j].NewName)
+                logFile.write(repr(ListOfFiles[j]))
+                print "\r{0:02d}%".format(j * 100 / len(filenames)),
+            except Exception as ex:
+                template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+                message = "Failed to rename " + template.format(type(ex).__name__, ex.args)
+                writeLog(message + " " + repr(ListOfFiles[j]))
+
+    f.close()
