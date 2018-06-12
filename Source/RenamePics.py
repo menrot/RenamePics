@@ -74,10 +74,12 @@ class ImageFileData(object):
                     try:
                         GPSTime = tags.__getitem__("GPS GPSTimeStamp").values
                         TimeStr = '{0:02d}:'.format(int(str(GPSTime[0]))) + '{0:02d}:'.format(int(str(GPSTime[1]))) + '{0:02d}'.format(int(str(GPSTime[2])))
-                        self.DateTime.values = unicode(self.DateTime.values[:11] + TimeStr)
-                        self.DateTime.printable = str(self.DateTime.values)
+                        if (TimeStr[0:5] != self.DateTime.printable[11:16]): # compare HH:MM
+                            writeLog("HUAWEI modified by GPS time " + repr(filename) + '  GPS:' + TimeStr + '  Time:' + self.DateTime.printable[11:19])
+                            self.DateTime.values = unicode(self.DateTime.values[:11] + TimeStr)
+                            self.DateTime.printable = str(self.DateTime.values)
                     except:
-                        writeLog("HUAWEI but No GPS timestamp " + repr(filename))
+                        pass
 
 #           GPS_Lat = tags.__getitem__('GPSLatitude')
 #           GPS_Long = tags.__getitem__('GPSLongitutde')
@@ -197,7 +199,7 @@ if __name__ == '__main__':
 
         for j in range(0, len(filenames)):
 
-            if (filenames[j][-4:].upper() == '.JPG'):
+            if (filenames[j][-4:].upper() == '.JPG') or (filenames[j][-5:].upper() == '.JPEG'):
 
                 print "\r{0:02d}%".format(j*100/len(filenames)),
 
@@ -272,18 +274,21 @@ if __name__ == '__main__':
 
 
 
-    print "\n*** Start Renaming files ***"
 
-    if DoRename:
-        for j in range(0, len(ListOfFiles)):
-            try:
+
+
+    print DoRename, "\n*** Start Renaming files ***, %s"
+
+    for j in range(0, len(ListOfFiles)):
+        try:
+            if DoRename:
                 os.rename(PicInputFolder + '\\' + ListOfFiles[j].OriginalName,
-                          PicOutputFolder + '\\' + ListOfFiles[j].NewName)
-                logFile.write(repr(ListOfFiles[j]))
-                print "\r{0:02d}%".format(j * 100 / len(filenames)),
-            except Exception as ex:
-                template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-                message = "Failed to rename " + template.format(type(ex).__name__, ex.args)
-                writeLog(message + " " + repr(ListOfFiles[j]))
+                      PicOutputFolder + '\\' + ListOfFiles[j].NewName)
+            logFile.write(repr(ListOfFiles[j]))
+            print "\r{0:02d}%".format(j * 100 / len(filenames)),
+        except Exception as ex:
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = "Failed to rename " + template.format(type(ex).__name__, ex.args)
+            writeLog(message + " " + repr(ListOfFiles[j]))
 
     f.close()
