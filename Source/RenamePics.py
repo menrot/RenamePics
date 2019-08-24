@@ -13,6 +13,8 @@ import csv
 import pickle
 import argparse
 import re
+from datetime import datetime
+
 
 
 class DateTime(object):
@@ -31,8 +33,8 @@ class ImageFileData(object):
         self.OriginalName = filename
 
         try:
-
-            f = open(path + '\\'+ filename, 'rb')
+            fullPath = path + '\\'+ filename
+            f = open(fullPath, 'rb')
 
             # for Exif tags description see:
             #   https: // sno.phy.queensu.ca / ~phil / exiftool / TagNames / EXIF.html
@@ -62,7 +64,12 @@ class ImageFileData(object):
                             self.DateTime.values = u'%s:%s:%s 12:00:00' % (filename[s:s+4],filename[s+4:s+6],filename[s+6:s+8])
                             self.DateTime.printable = str(self.DateTime.values)
                         else:
-                            raise ValueError('No EXIF and no match for date in file name')
+                            try:
+                                fileTime = min(os.path.getctime(fullPath),os.path.getmtime(fullPath)) # the earliest from creation and modification
+                                self.DateTime.values = datetime.fromtimestamp(fileTime).strftime("%Y:%m:%d %I:%M:%S")
+                                self.DateTime.printable = str(self.DateTime.values)
+                            except:
+                                raise ValueError('No EXIF and no match for date in file name')
 
 
 
@@ -190,7 +197,7 @@ if __name__ == '__main__':
         print ('Itinerary file exception', ex)
         exit(1)
 
-    logFile = open(ItineraryFile[:-4] + '.log', 'w') # Log file
+    logFile = open(ItineraryFile[:-4] + '_log_' + datetime.now().strftime("%Y%m%d_%I%M%S") + '.log', 'w') # Log file
 
 
     itinerary.sort(key=getKeyItinerary)
