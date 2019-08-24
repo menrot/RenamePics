@@ -117,7 +117,7 @@ def getKeyItinerary(item):
 def writeLog(*args):
     logFile.write(*args)
     logFile.write('\n')
-    print "\n",args
+    print ("\n",args)
     return
 
 
@@ -146,7 +146,7 @@ parser.add_argument('-R', dest='DoRename', action='store_true',  # By default - 
 
 if __name__ == '__main__':
 
-    print 'RenamePics Release 2.0'   #update release number
+    print ('RenamePics Release 3.0')   #update release number
 
     MyArgs = vars(parser.parse_args())
 
@@ -173,18 +173,21 @@ if __name__ == '__main__':
     except:
         print("No Input folder")
         exit(1)
+    if len(filenames)==0:
+        print("No files in input folder")
+        exit(1)
 
     itinerary = []
 
 
     try:
-        with open(ItineraryFile, 'rb') as f:
+        with open(ItineraryFile, 'r') as f:
             reader = csv.reader(f)
             for row in reader:
                 itinerary.append(row)
 
     except Exception as ex:
-        print 'Itinerary file exception', ex
+        print ('Itinerary file exception', ex)
         exit(1)
 
     logFile = open(ItineraryFile[:-4] + '.log', 'w') # Log file
@@ -194,15 +197,22 @@ if __name__ == '__main__':
     DefaultTime = itinerary[0][0]
     DefaultLocation = itinerary[0][1]
 
-    if not(UsePreviousFileList):
+    try:
+        fpkl= open('listOfFile.pkl', 'rb')
+    except:
+        UsePreviousFileList = False
+
+
+    if UsePreviousFileList:
+        with open('listOfFile.pkl', 'rb') as fpkl:
+            ListOfFiles = pickle.load(fpkl)
+            fpkl.close()
+    else:
         ListOfFiles = []
 
         for j in range(0, len(filenames)):
-
             if (filenames[j][-4:].upper() == '.JPG') or (filenames[j][-5:].upper() == '.JPEG'):
-
-                print "\r{0:02d}%".format(j*100/len(filenames)),
-
+                print ('\r{0:02f}%'.format(j * 100 / len(filenames)),) # print progress
                 tempData = ImageFileData(PicInputFolder, filenames[j])
                 if not tempData.Ignore :
                     ListOfFiles.append(tempData)
@@ -214,10 +224,6 @@ if __name__ == '__main__':
             pickle.dump(ListOfFiles,fpkl)
             fpkl.close()
 
-    else:
-        with open('listOfFile.pkl', 'rb') as fpkl:
-            ListOfFiles = pickle.load(fpkl)
-            fpkl.close()
 
     j = 0
     State = 0
@@ -232,14 +238,14 @@ if __name__ == '__main__':
             LastDate = ListOfFiles[j].DateTime.printable[:10]
 
         if MyDebug:
-            print 'j = ', j
+            print ('j = ', j)
 
 
         for i in range(Last_i, len(itinerary)-1):
 
 
             if MyDebug:
-                print '    i = ', i
+                print ('    i = ', i)
 
             if (ListOfFiles[j].DateTime.printable < itinerary[i][0]):
                 ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
@@ -257,7 +263,7 @@ if __name__ == '__main__':
                 j = j + 1
                 break
             elif (ListOfFiles[j].DateTime.printable >= itinerary[len(itinerary)-1][0]):
-                Last_i = len(itinerary)-1
+                # Last_i = len(itinerary)-1
                 Location = itinerary[len(itinerary)-1][1]
                 ListOfFiles[j].NewName = ListOfFiles[j].Date + ' ' + '{0:04d}'.format(IdinDay) + ' ' + Location + '.jpg'
                 j = j + 1
@@ -267,7 +273,7 @@ if __name__ == '__main__':
                 State = 0
 
         if MyDebug:
-            print ListOfFiles[j-1].NewName
+            print (ListOfFiles[j-1].NewName)
 
 
 
@@ -277,7 +283,7 @@ if __name__ == '__main__':
 
 
 
-    print DoRename, "\n*** Start Renaming files ***, %s"
+    print (DoRename, "\n*** Start Renaming files ***, %s")
 
     for j in range(0, len(ListOfFiles)):
         try:
@@ -285,7 +291,7 @@ if __name__ == '__main__':
                 os.rename(PicInputFolder + '\\' + ListOfFiles[j].OriginalName,
                       PicOutputFolder + '\\' + ListOfFiles[j].NewName)
             logFile.write(repr(ListOfFiles[j]))
-            print "\r{0:02d}%".format(j * 100 / len(filenames)),
+            print ("\r{0:02f}%".format(j * 100 / len(filenames)),) # print progress
         except Exception as ex:
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
             message = "Failed to rename " + template.format(type(ex).__name__, ex.args)
