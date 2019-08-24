@@ -106,7 +106,9 @@ venv.bak/
 # Project specific
 /.idea
 /Trip\ 2017
+/Trip\2019
 "/Trip 2017"
+"/Trip2019"
 /source/.idea
 *.jpg
 /archive
